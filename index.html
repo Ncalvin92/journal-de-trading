@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Journal de Trading</title>
+</head>
+<body style="margin:0;background:#0a0e18;">
+<div id="app-root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  #app-root {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #0a0e18;
+    color: #e6e9f0;
+    min-height: 100vh;
+    padding: 32px 28px;
+  }
+  .jt-container { max-width: 1360px; margin: 0 auto; }
+  .jt-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+  .jt-title { font-size: 26px; font-weight: 800; letter-spacing: 0.3px; }
+  .jt-title span { color: #22d3ac; }
+  .jt-subtitle { font-size:15px; font-weight:700; color:#e6e9f0; margin:0; }
+  .jt-actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .jt-btn {
+    background:#151b2c; border:1px solid #262f47; color:#e6e9f0;
+    padding:9px 15px; border-radius:8px; cursor:pointer; font-size:12.5px; font-weight:600;
+    display:inline-flex; align-items:center; gap:6px; transition:.15s; white-space:nowrap;
+  }
+  .jt-btn:hover { background:#1c2438; border-color:#374162; }
+  .jt-btn.primary { background:#22d3ac; color:#06120e; border-color:#22d3ac; }
+  .jt-btn.primary:hover { background:#1bbd99; }
+  .jt-btn.danger { background:#2a1420; color:#f87171; border-color:#4a1f2c; }
+  .jt-btn.danger:hover { background:#3a1a29; }
+  .jt-btn:disabled { opacity:.45; cursor:not-allowed; }
+  .jt-btn-sm { padding:6px 11px; font-size:11.5px; }
+
+  .jt-toolbar { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+  .jt-select, .jt-input {
+    background:#111726; border:1px solid #262f47; color:#cbd3e6;
+    padding:8px 12px; border-radius:7px; font-size:12.5px; max-width:100%;
+  }
+  .jt-chip {
+    background:#1a2035; border:1px solid #2c3654; color:#9fb0d6;
+    padding:5px 10px; border-radius:20px; font-size:12px; display:inline-flex; align-items:center; gap:6px;
+  }
+  .jt-chip button { background:none; border:none; color:#7c8bb5; cursor:pointer; font-size:13px; padding:0; }
+
+  .jt-stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(210px,1fr)); gap:14px; margin-bottom:20px; }
+  .jt-card { background:#111726; border:1px solid #1e2740; border-radius:12px; padding:16px 18px; min-width:0; box-shadow:0 1px 0 rgba(255,255,255,.02) inset; }
+  .jt-card .label { font-size:10.5px; letter-spacing:.8px; color:#7c8bb5; text-transform:uppercase; margin-bottom:8px; overflow-wrap:break-word; }
+  .jt-card .value { font-size:23px; font-weight:800; overflow-wrap:break-word; word-break:break-word; line-height:1.2; }
+  .jt-card .value.pos { color:#22d3ac; }
+  .jt-card .value.neg { color:#f87171; }
+
+  .jt-layout { display:grid; grid-template-columns: 2fr 1fr; gap:18px; align-items:start; min-width:0; }
+  @media (max-width: 1000px) { .jt-layout { grid-template-columns: 1fr; } }
+
+  .jt-panel { background:#111726; border:1px solid #1e2740; border-radius:14px; padding:18px 20px; margin-bottom:18px; min-width:0; }
+  .jt-panel h3 { font-size:12.5px; text-transform:uppercase; letter-spacing:1px; color:#9fb0d6; margin:0 0 14px 0; }
+  .jt-panel-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .jt-panel-head h3 { margin:0; }
+  .jt-note { font-size:12px; color:#7c8bb5; margin:0 0 14px; line-height:1.55; }
+
+  .scroll-box { max-height:460px; overflow-y:auto; overflow-x:auto; border-radius:10px; }
+  .scroll-box::-webkit-scrollbar { width:8px; height:8px; }
+  .scroll-box::-webkit-scrollbar-thumb { background:#263050; border-radius:8px; }
+  .scroll-box::-webkit-scrollbar-track { background:transparent; }
+
+  table { width:100%; border-collapse:collapse; font-size:12.5px; min-width:640px; }
+  th { text-align:left; color:#7c8bb5; font-weight:600; font-size:10.5px; text-transform:uppercase; padding:8px 10px; border-bottom:1px solid #1f2740; background:#111726; position:sticky; top:0; z-index:1; }
+  td { padding:10px; border-bottom:1px solid #161c2c; vertical-align:middle; white-space:nowrap; }
+  tr:hover td { background:#151b2c; }
+  .badge { padding:3px 10px; border-radius:6px; font-size:10.5px; font-weight:700; letter-spacing:.4px; display:inline-block; }
+  .badge.win { background:#0d2a22; color:#22d3ac; }
+  .badge.loss { background:#2a1420; color:#f87171; }
+  .badge.neutral { background:#1a2035; color:#9fb0d6; }
+  .badge.side-long { border:1px solid #2c3654; color:#9fb0d6; border-radius:6px; padding:3px 10px; font-size:10.5px; }
+  .badge.side-short { border:1px solid #453054; color:#c99fd6; border-radius:6px; padding:3px 10px; font-size:10.5px; }
+  .tag { background:#241a3a; color:#b79bf0; padding:3px 9px; border-radius:5px; font-size:10.5px; margin-right:4px; margin-bottom:4px; display:inline-block; }
+  .ret-pos { color:#22d3ac; font-weight:700; }
+  .ret-neg { color:#f87171; font-weight:700; }
+  .row-actions { display:flex; gap:2px; opacity:0; transition:.15s; }
+  tr:hover .row-actions, tr:focus-within .row-actions { opacity:1; }
+  .row-actions button { background:none; border:none; color:#7c8bb5; cursor:pointer; font-size:14px; padding:2px 6px; }
+  .row-actions button:hover { color:#e6e9f0; }
+  .empty-state { text-align:center; padding:46px 20px; color:#7c8bb5; }
+  .empty-state b { color:#cbd3e6; }
+  .sel-col { width:32px; }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(4,6,11,.72); display:flex; align-items:center; justify-content:center; z-index:60; padding:20px; }
+  .modal { background:#131a2b; border:1px solid #263050; border-radius:14px; padding:26px; width:560px; max-width:92vw; max-height:88vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+  .modal h2 { margin:0 0 18px 0; font-size:18px; }
+  .form-row { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px; }
+  .form-row.full { grid-template-columns: 1fr; }
+  .form-row label { display:block; font-size:11px; color:#7c8bb5; margin-bottom:5px; text-transform:uppercase; letter-spacing:.5px; }
+  .form-row input, .form-row select { width:100%; background:#0d1220; border:1px solid #262f47; color:#e6e9f0; padding:9px 10px; border-radius:7px; font-size:13px; }
+  .modal-footer { display:flex; justify-content:flex-end; gap:10px; margin-top:16px; flex-wrap:wrap; }
+  .modal-footer.spread { justify-content:space-between; }
+  .setup-input-row { display:flex; gap:8px; margin-bottom:8px; }
+  .setup-input-row input, .setup-input-row select { flex:1; }
+  .setup-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .setup-tags .tag { display:flex; align-items:center; gap:5px; }
+  .setup-tags .tag button { background:none;border:none;color:#b79bf0;cursor:pointer; }
+  .chk-label { display:flex; align-items:center; gap:7px; font-size:12.5px; color:#cbd3e6; margin-bottom:6px; text-transform:none; letter-spacing:0; font-weight:400; }
+  .chk-label input { width:auto; }
+  .section-label { font-size:11px; color:#7c8bb5; text-transform:uppercase; letter-spacing:.5px; display:block; margin:10px 0 6px; }
+  .confirm-modal p { font-size:14px; line-height:1.55; margin:4px 0 20px; white-space:pre-line; }
+
+  .error-banner { background:#2a1420; border:1px solid #6b2233; color:#ffb4c0; padding:12px 16px; border-radius:10px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  .error-banner button { background:#f87171; color:#2a1420; border:none; padding:6px 14px; border-radius:6px; font-weight:700; cursor:pointer; font-size:12px; }
+
+  .loading { text-align:center; padding:60px; color:#7c8bb5; }
+  canvas { max-height:220px; }
+  .import-input { display:none; }
+</style>
+<script>
+(function() {
+  // ============================================================================
+  // STOCKAGE — utilise window.storage dans Claude.ai, bascule sur localStorage
+  // du navigateur si absent (ex: hébergé sur GitHub Pages). Universel.
+  // ============================================================================
+  const storageAdapter = (typeof window.storage !== 'undefined') ? window.storage : {
+    async get(key) {
+      const v = localStorage.getItem('jt_' + key);
+      if (v === null) throw new Error('not found');
+      return { key, value: v };
+    },
+    async set(key, value) { localStorage.setItem('jt_' + key, value); return { key, value }; },
+    async delete(key) { localStorage.removeItem('jt_' + key); return { key, deleted: true }; },
+    async list(prefix) {
+      const keys = Object.keys(localStorage).filter(k => k.startsWith('jt_' + (prefix||''))).map(k => k.slice(3));
+      return { keys };
+    }
+  };
+
+  // ============================================================================
+  // ÉTAT
+  // ============================================================================
+  let trades = [];
+  let filters = { symbol:"", setup:"", side:"", status:"", platform:"" };
+  let account = { deposits: [], withdrawals: [], equityOverride: null };
+  let plan = {
+    traderType: '', assets: [], sessions: [], sessionStart: '09:30', sessionEnd: '18:00',
+    tradeAfterNews: '', confirmations: [], riskPerTrade: '', maxLossSession: '', maxLossWeek: '',
+    maxGainSession: '', stopAfterLosses: '', rrMin: '', rrCustom: '', tradeManagement: [], psychChecklist: [],
+    monthlyGoal: '', notes: ''
+  };
+  let lastSaveError = null;
+  let complianceView = 'day';
+  let selectionMode = false;
+  let selectedIds = new Set();
+
+  const CONFIRMATION_OPTIONS = ['Chandelier Japonais','Tendance','Liquidité (Sweep)','BOS','M Top / M Bottom','FVG','Order Block (OB)','Equilibrium (EQ)'];
+  const ASSET_OPTIONS = ['BTC/USD','ETH/USD','XAU/USD (Or)','Forex','Indices','Actions'];
+  const SESSION_OPTIONS = ['Asia','Londres','New York'];
+  const MANAGEMENT_OPTIONS = ['Clôture totale au TP','Clôture partielle','Break-even (BE)'];
+  const PSYCH_OPTIONS = ['Bien dormi','Bien mangé','Calme / serein','Pas stressé','Pas fatigué','Pas émotif','Environnement sans distraction'];
+  const RR_OPTIONS = ['1:1','1:2','1:3','1:4','Autre'];
+
+  const root = document.getElementById('app-root');
+  root.innerHTML = '<div class="loading">Chargement du journal…</div>';
+
+  // ============================================================================
+  // POPUPS INTERNES — remplace confirm()/alert() natifs (bloqués dans certains
+  // environnements en iframe, dont l'aperçu Claude.ai). Tout passe par ici.
+  // ============================================================================
+  function showAlert(message) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal confirm-modal" style="width:420px;text-align:center;">
+      <p>${escapeHtml(message)}</p>
+      <div class="modal-footer" style="justify-content:center;"><button class="jt-btn primary btn-alert-ok">OK</button></div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.btn-alert-ok').onclick = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  }
+
+  function showConfirm(message, onConfirm, opts) {
+    const danger = opts && opts.danger;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal confirm-modal" style="width:440px;text-align:center;">
+      <p>${escapeHtml(message)}</p>
+      <div class="modal-footer" style="justify-content:center;">
+        <button class="jt-btn btn-confirm-cancel">Annuler</button>
+        <button class="jt-btn ${danger ? 'danger' : 'primary'} btn-confirm-ok">Confirmer</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.btn-confirm-cancel').onclick = () => overlay.remove();
+    overlay.querySelector('.btn-confirm-ok').onclick = () => { overlay.remove(); onConfirm(); };
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  }
+
+  // ============================================================================
+  // CHARGEMENT / SAUVEGARDE (avec nouvelle tentative + erreur visible si échec)
+  // ============================================================================
+  async function loadTrades() {
+    try { const res = await storageAdapter.get('trades'); trades = res ? JSON.parse(res.value) : []; }
+    catch(e) { trades = []; }
+    try { const r = await storageAdapter.get('account'); if (r) account = JSON.parse(r.value); }
+    catch(e) { /* défauts */ }
+    try { const r = await storageAdapter.get('plan'); if (r) plan = JSON.parse(r.value); }
+    catch(e) { /* défauts */ }
+    render();
+  }
+
+  async function saveWithRetry(key, value, label, onDone) {
+    try {
+      await storageAdapter.set(key, value);
+      if (lastSaveError && lastSaveError.what === label) { lastSaveError = null; render(); }
+      if (onDone) onDone();
+    } catch(e1) {
+      await new Promise(r => setTimeout(r, 700));
+      try {
+        await storageAdapter.set(key, value);
+        if (lastSaveError && lastSaveError.what === label) { lastSaveError = null; render(); }
+        if (onDone) onDone();
+      } catch(e2) {
+        console.error('Erreur de sauvegarde:', label, e2);
+        lastSaveError = { what: label, retry: () => saveWithRetry(key, value, label, onDone) };
+        render();
+      }
+    }
+  }
+
+  function saveTrades()  { saveWithRetry('trades', JSON.stringify(trades), 'trades'); }
+  function saveAccount() { saveWithRetry('account', JSON.stringify(account), 'account'); }
+  function savePlan()    { saveWithRetry('plan', JSON.stringify(plan), 'plan'); }
+
+  // ============================================================================
+  // UTILITAIRES
+  // ============================================================================
+  function numify(s) { return parseFloat(String(s||'').replace(/\s|\u00a0/g,'').replace(',', '.')) || 0; }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // Pas d'arrondi : toujours 2 décimales (centimes) affichées.
+  function fmt$(n) {
+    const sign = n < 0 ? '-' : '';
+    return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function uniqueSetups() {
+    const s = new Set();
+    trades.forEach(t => (t.setups||[]).forEach(x => s.add(x)));
+    return Array.from(s).sort();
+  }
+
+  function uniquePlatforms() {
+    const s = new Set();
+    trades.forEach(t => s.add(t.platform || 'Manuel'));
+    return Array.from(s).sort();
+  }
+
+  function tradeSignature(t) {
+    return t.sourceId || ['sig', t.date, t.symbol, t.entry, t.exit, t.size, t.side, t.returnDollar].join('|');
+  }
+
+  function filteredTrades() {
+    return trades.filter(t => {
+      if (filters.symbol && t.symbol.toLowerCase() !== filters.symbol.toLowerCase()) return false;
+      if (filters.setup && !(t.setups||[]).includes(filters.setup)) return false;
+      if (filters.side && t.side !== filters.side) return false;
+      if (filters.platform && (t.platform || 'Manuel') !== filters.platform) return false;
+      if (filters.status) {
+        const isWin = t.returnDollar >= 0;
+        if (filters.status === 'Win' && !isWin) return false;
+        if (filters.status === 'Loss' && isWin) return false;
+      }
+      return true;
+    }).sort((a,b) => new Date(b.date) - new Date(a.date));
+  }
+
+  function stats(list) {
+    const total = list.length;
+    const wins = list.filter(t => t.returnDollar >= 0).length;
+    const cumul = list.reduce((s,t) => s + t.returnDollar, 0);
+    const avg = total ? cumul / total : 0;
+    const winRatio = total ? (wins/total*100) : 0;
+    return { total, wins, cumul, avg, winRatio };
+  }
+
+  function planDiscipline(list) {
+    const marked = list.filter(t => t.planRespected === 'Oui' || t.planRespected === 'Non');
+    const respected = list.filter(t => t.planRespected === 'Oui');
+    const rate = marked.length ? (respected.length / marked.length * 100) : null;
+    const winWhenRespected = respected.length ? (respected.filter(t=>t.returnDollar>=0).length / respected.length * 100) : null;
+    const notRespected = list.filter(t => t.planRespected === 'Non');
+    const winWhenNot = notRespected.length ? (notRespected.filter(t=>t.returnDollar>=0).length / notRespected.length * 100) : null;
+    return { rate, marked: marked.length, winWhenRespected, winWhenNot };
+  }
+
+  function confirmationUsageStats() {
+    const map = {};
+    trades.forEach(t => (t.confirmations||[]).forEach(c => { map[c] = (map[c]||0) + 1; }));
+    const total = trades.length || 1;
+    return Object.keys(map).sort((a,b)=>map[b]-map[a]).map(k => ({ name:k, count:map[k], pct: Math.round(map[k]/total*100) }));
+  }
+
+  // ============================================================================
+  // COMPTE — modèle unifié : Solde = Dépôts nets + Profit des trades.
+  // ============================================================================
+  function accountMetrics() {
+    const events = [];
+    account.deposits.forEach(d => events.push({ date:d.date, amount:d.amount, kind:'deposit' }));
+    account.withdrawals.forEach(w => events.push({ date:w.date, amount:-w.amount, kind:'withdrawal' }));
+    trades.forEach(t => events.push({ date:t.date, amount:t.returnDollar, kind:'trade' }));
+    events.sort((a,b) => new Date(a.date) - new Date(b.date));
+
+    const netDeposits = account.deposits.reduce((s,d)=>s+d.amount,0) - account.withdrawals.reduce((s,w)=>s+w.amount,0);
+    const totalProfit = trades.reduce((s,t)=>s+t.returnDollar,0);
+    const balance = netDeposits + totalProfit;
+    const equity = (account.equityOverride !== null && account.equityOverride !== undefined && account.equityOverride !== '') ? parseFloat(account.equityOverride) : balance;
+    const gain = netDeposits ? (totalProfit / netDeposits * 100) : 0;
+
+    let cum = 0, peak = 0, maxDD = 0, highest = 0, highestDate = '';
+    const curve = [{ date: events.length ? events[0].date : new Date().toISOString().slice(0,10), value: 0 }];
+    events.forEach(ev => {
+      cum += ev.amount;
+      if (cum > peak) peak = cum;
+      const dd = peak ? (peak - cum) / peak * 100 : 0;
+      if (dd > maxDD) maxDD = dd;
+      if (cum > highest) { highest = cum; highestDate = ev.date; }
+      curve.push({ date: ev.date, value: cum, kind: ev.kind });
+    });
+
+    return { balance, equity, profit: totalProfit, gain, drawdown: maxDD, highest, highestDate, netDeposits, curve };
+  }
+
+  // ============================================================================
+  // RESPECT AUTOMATIQUE DU PLAN — approximatif (voir note dans l'UI)
+  // ============================================================================
+  function isoWeekKey(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    const target = new Date(d.valueOf());
+    const dayNr = (d.getDay() + 6) % 7;
+    target.setDate(target.getDate() - dayNr + 3);
+    const firstThursday = new Date(target.getFullYear(), 0, 4);
+    const week = 1 + Math.round(((target - firstThursday) / 86400000 - 3 + ((firstThursday.getDay()+6)%7)) / 7);
+    return target.getFullYear() + '-S' + String(week).padStart(2,'0');
+  }
+
+  function periodKey(dateStr, period) {
+    if (period === 'day') return dateStr;
+    if (period === 'week') return isoWeekKey(dateStr);
+    if (period === 'month') return dateStr.slice(0,7);
+    return dateStr.slice(0,4);
+  }
+
+  function computeCompliance(period) {
+    const acc = accountMetrics();
+    const base = acc.netDeposits || 1;
+    const groups = {};
+    trades.forEach(t => {
+      const k = periodKey(t.date, period);
+      (groups[k] = groups[k] || []).push(t);
+    });
+    return Object.keys(groups).sort().reverse().map(key => {
+      const list = groups[key].slice().sort((a,b)=> new Date(a.date)-new Date(b.date));
+      const pnl = list.reduce((s,t)=>s+t.returnDollar,0);
+      const pnlPct = pnl / base * 100;
+      let maxConsecLoss = 0, curLoss = 0;
+      list.forEach(t => { if (t.returnDollar < 0) { curLoss++; maxConsecLoss = Math.max(maxConsecLoss, curLoss); } else curLoss = 0; });
+      const reasons = [];
+      let hasRule = false;
+      if (period === 'day' && plan.maxLossSession && pnlPct < -Math.abs(numify(plan.maxLossSession))) { reasons.push('perte du jour > ' + plan.maxLossSession + '% (' + pnlPct.toFixed(1) + '%)'); hasRule = true; }
+      if (period === 'day' && plan.maxGainSession && pnlPct > Math.abs(numify(plan.maxGainSession))) { reasons.push('gain du jour > ' + plan.maxGainSession + '% — objectif atteint, a-t-on arrêté ?'); hasRule = true; }
+      if (period === 'week' && plan.maxLossWeek && pnlPct < -Math.abs(numify(plan.maxLossWeek))) { reasons.push('perte de la semaine > ' + plan.maxLossWeek + '% (' + pnlPct.toFixed(1) + '%)'); hasRule = true; }
+      if (plan.stopAfterLosses && maxConsecLoss > parseInt(plan.stopAfterLosses)) { reasons.push(maxConsecLoss + ' pertes consécutives (limite : ' + plan.stopAfterLosses + ')'); hasRule = true; }
+      const manualOverrides = list.filter(t => t.planRespected === 'Oui' || t.planRespected === 'Non');
+      const verdict = !hasRule ? 'Non évalué' : (reasons.length ? 'Non respecté' : 'Respecté');
+      return { key, count: list.length, pnl, pnlPct, verdict, reasons, manualCount: manualOverrides.length };
+    });
+  }
+
+  // ============================================================================
+  // IMPORT — MT4/MT5 : encodage auto (UTF-8/UTF-16), HTML (table native),
+  // Excel réel .xls/.xlsx (via SheetJS), texte/CSV en repli. Dédoublonnage inclus.
+  // ============================================================================
+  function decodeFile(buffer) {
+    const bytes = new Uint8Array(buffer);
+    if (bytes[0] === 0xFF && bytes[1] === 0xFE) return new TextDecoder('utf-16le').decode(buffer);
+    if (bytes[0] === 0xFE && bytes[1] === 0xFF) return new TextDecoder('utf-16be').decode(buffer);
+    return new TextDecoder('utf-8').decode(buffer);
+  }
+
+  function isSpreadsheetBinary(buffer) {
+    const b = new Uint8Array(buffer.slice(0, 8));
+    if (b[0]===0xD0 && b[1]===0xCF && b[2]===0x11 && b[3]===0xE0) return true; // OLE2 (.xls)
+    if (b[0]===0x50 && b[1]===0x4B && b[2]===0x03 && b[3]===0x04) return true; // ZIP (.xlsx)
+    return false;
+  }
+
+  function extractMT5Meta(flatText) {
+    const courtier = (flatText.match(/Courtier\s*:?\s*([^\n\r]+)/i) || [])[1];
+    const compte = (flatText.match(/Compte\s*:?\s*(\d+)/i) || [])[1];
+    if (courtier) return courtier.trim().replace(/\s+/g,' ') + (compte ? ' (' + compte + ')' : '');
+    return compte ? 'Compte ' + compte : null;
+  }
+
+  const MT5_POS_LINE_RE = /^(\d{4}\.\d{2}\.\d{2}\s\d{2}:\d{2}:\d{2})\s+(\d+)\s+(\S+)\s+(buy|sell)\s+([\d.]+)\s+([\d.]+)\s+.*?(\d{4}\.\d{2}\.\d{2}\s\d{2}:\d{2}:\d{2})\s+([\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s*$/;
+  const MT5_SECTION_NAMES = ['positions','ordres','orders','transactions','deals','résultats','results'];
+
+  function parseMT5PositionsFromLines(lines, platform) {
+    let startIdx = lines.findIndex(l => l.trim().toLowerCase() === 'positions');
+    if (startIdx === -1) return [];
+    const out = [];
+    let consecutiveBlank = 0;
+    for (let i = startIdx + 1; i < lines.length; i++) {
+      const line = (lines[i] || '').trim();
+      if (!line) { consecutiveBlank++; if (consecutiveBlank >= 2 && out.length) break; continue; }
+      consecutiveBlank = 0;
+      if (MT5_SECTION_NAMES.includes(line.toLowerCase())) break;
+      const m = line.match(MT5_POS_LINE_RE);
+      if (!m) continue;
+      const [, , posId, symbol, type, volume, openPrice, closeTime, closePrice, commission, swap, profit] = m;
+      const dm = closeTime.match(/(\d{4})\.(\d{2})\.(\d{2})/);
+      out.push({
+        sourceId: 'mt5-' + posId,
+        date: dm[1] + '-' + dm[2] + '-' + dm[3],
+        symbol: symbol.toUpperCase(),
+        entry: numify(openPrice), exit: numify(closePrice), size: numify(volume),
+        side: type.toLowerCase() === 'sell' ? 'Short' : 'Long',
+        returnDollar: numify(profit) + numify(commission) + numify(swap),
+        returnPercent: 0, confirmations: [], planRespected: '',
+        setups: ['Import MT5'], platform: platform || 'MT5'
+      });
+    }
+    return out;
+  }
+
+  function parseMT5PositionsFromDOM(doc, platform) {
+    const allRows = Array.from(doc.querySelectorAll('tr'));
+    let startIdx = -1;
+    for (let i = 0; i < allRows.length; i++) {
+      const th = allRows[i].querySelector('th');
+      if (th && th.textContent.trim().toLowerCase() === 'positions') { startIdx = i; break; }
+    }
+    if (startIdx === -1) return [];
+    const dataRows = [];
+    for (let i = startIdx + 2; i < allRows.length; i++) {
+      const row = allRows[i];
+      if (row.querySelector('th')) break;
+      const tds = Array.from(row.querySelectorAll('td')).map(td => td.textContent.replace(/\u00a0/g,' ').trim());
+      if (tds.length === 0 || tds.every(c => c === '')) break;
+      dataRows.push(tds);
+    }
+    const out = [];
+    dataRows.forEach(cells => {
+      let c = cells;
+      if (c.length === 13) c = [c[0],c[1],c[2],c[3],'',c[4],c[5],c[6],c[7],c[8],c[9],c[10],c[11],c[12]];
+      if (c.length < 14) return;
+      const [openTime, posId, symbol, type, , volume, openPrice, sl, tp, closeTime, closePrice, commission, swap, profit] = c;
+      if (!symbol || !/[a-zA-Z]/.test(symbol)) return;
+      const dm = (closeTime || openTime || '').match(/(\d{4})[.\-\/](\d{2})[.\-\/](\d{2})/);
+      const date = dm ? `${dm[1]}-${dm[2]}-${dm[3]}` : new Date().toISOString().slice(0,10);
+      out.push({
+        sourceId: 'mt5-' + posId, date, symbol: symbol.toUpperCase(),
+        entry: numify(openPrice), exit: numify(closePrice), size: numify(volume),
+        side: type.toLowerCase().includes('sell') ? 'Short' : 'Long',
+        returnDollar: numify(profit) + numify(commission) + numify(swap),
+        returnPercent: 0, confirmations: [], planRespected: '',
+        setups: ['Import MT5'], platform: platform || 'MT5'
+      });
+    });
+    return out;
+  }
+
+  function mergeImportedTrades(imported, sourceLabel) {
+    const existingSigs = new Set(trades.map(tradeSignature));
+    const fresh = [];
+    const seenNow = new Set();
+    imported.forEach(t => {
+      const sig = tradeSignature(t);
+      if (existingSigs.has(sig) || seenNow.has(sig)) return;
+      seenNow.add(sig);
+      fresh.push(t);
+    });
+    const dupCount = imported.length - fresh.length;
+    if (fresh.length) { trades = trades.concat(fresh); saveTrades(); render(); }
+    let msg = fresh.length + ' position(s) importée(s)' + (sourceLabel ? ' (' + sourceLabel + ')' : '') + '.';
+    if (dupCount > 0) msg += '\n' + dupCount + ' étaient déjà présentes et ont été ignorées (pas de doublon).';
+    if (!fresh.length && !dupCount) msg = 'Aucune position trouvée dans ce fichier.';
+    showAlert(msg);
+  }
+
+  function importMTReport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const buffer = evt.target.result;
+
+        if (isSpreadsheetBinary(buffer) && typeof XLSX !== 'undefined') {
+          const wb = XLSX.read(buffer, { type: 'array' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+          const lines = rows.map(r => r.join(' ').trim());
+          const platform = extractMT5Meta(lines.join('\n'));
+          const found = parseMT5PositionsFromLines(lines, platform);
+          if (found.length) { mergeImportedTrades(found, platform); e.target.value=''; return; }
+          throw new Error('positions introuvables dans le fichier Excel');
+        }
+
+        const text = decodeFile(buffer);
+
+        if (/<table/i.test(text)) {
+          const doc = new DOMParser().parseFromString(text, 'text/html');
+          const platform = extractMT5Meta(doc.body ? doc.body.textContent : text);
+          const found = parseMT5PositionsFromDOM(doc, platform);
+          if (found.length) { mergeImportedTrades(found, platform); e.target.value=''; return; }
+        }
+
+        {
+          const lines = text.split(/\r?\n/);
+          const platform = extractMT5Meta(text);
+          const found = parseMT5PositionsFromLines(lines, platform);
+          if (found.length) { mergeImportedTrades(found, platform); e.target.value=''; return; }
+        }
+
+        let rows = [];
+        const isHtml = /<table/i.test(text);
+        if (isHtml) {
+          const doc = new DOMParser().parseFromString(text, 'text/html');
+          const tables = Array.from(doc.querySelectorAll('table'));
+          let best = null, bestScore = -1;
+          tables.forEach(tbl => {
+            const txt = tbl.textContent.toLowerCase();
+            let score = 0;
+            ['profit','symbol','type','price','volume','lots'].forEach(kw => { if (txt.includes(kw)) score++; });
+            if (score >= 2 && tbl.rows.length > bestScore) { best = tbl; bestScore = tbl.rows.length; }
+          });
+          if (!best) throw new Error('table introuvable');
+          rows = Array.from(best.rows).map(r => Array.from(r.cells).map(c => c.textContent.trim()));
+        } else {
+          const candidates = ['\t', ';', ',', '|'];
+          let bestSep = ',', bestCols = 0;
+          candidates.forEach(sep => {
+            const firstLine = text.split(/\r?\n/).find(l => l.trim()) || '';
+            const cols = firstLine.split(sep).length;
+            if (cols > bestCols) { bestCols = cols; bestSep = sep; }
+          });
+          rows = text.split(/\r?\n/).filter(l=>l.trim()).map(l => l.split(bestSep).map(c=>c.trim().replace(/^"|"$/g,'')));
+        }
+        if (rows.length < 2) throw new Error('aucune ligne de données');
+
+        const header = rows[0].map(h => h.toLowerCase());
+        const findCol = (keywords) => header.findIndex(h => keywords.some(k => h.includes(k)));
+        const iSymbol = findCol(['symbol','item']);
+        const iType   = findCol(['type','direction']);
+        const iVolume = findCol(['volume','size','lots']);
+        const iProfit = findCol(['profit']);
+        const iCloseTime = findCol(['close time']);
+        const iOpenTime  = findCol(['open time','time']);
+        const priceIdx = header.map((h,i)=>h.includes('price')?i:-1).filter(i=>i>=0);
+        const iOpenPrice  = priceIdx[0] ?? -1;
+        const iClosePrice = priceIdx[1] ?? -1;
+        if (iSymbol < 0 || iProfit < 0) throw new Error('colonnes non reconnues');
+
+        let imported = [];
+        for (let i = 1; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r[iSymbol] || !/[a-zA-Z]/.test(r[iSymbol])) continue;
+          const profit = numify(r[iProfit]);
+          const dateRaw = (iCloseTime>=0 ? r[iCloseTime] : r[iOpenTime]) || '';
+          const dm = dateRaw.match(/(\d{4})[.\-\/](\d{2})[.\-\/](\d{2})/);
+          const date = dm ? `${dm[1]}-${dm[2]}-${dm[3]}` : new Date().toISOString().slice(0,10);
+          const typeRaw = (iType>=0 ? r[iType] : '').toLowerCase();
+          const entryV = iOpenPrice>=0 ? numify(r[iOpenPrice]) : 0;
+          const exitV = iClosePrice>=0 ? numify(r[iClosePrice]) : 0;
+          const sizeV = iVolume>=0 ? numify(r[iVolume]) : 0;
+          imported.push({
+            sourceId: 'gen-' + date + '-' + r[iSymbol] + '-' + entryV + '-' + exitV + '-' + profit,
+            date, symbol: (r[iSymbol]||'N/A').toUpperCase(),
+            entry: entryV, exit: exitV, size: sizeV,
+            side: typeRaw.includes('sell') ? 'Short' : 'Long',
+            returnDollar: profit, returnPercent: 0, confirmations: [], planRespected: '',
+            setups: ['Import (générique)'], platform: 'Import générique'
+          });
+        }
+        if (!imported.length) throw new Error('aucun trade détecté');
+        mergeImportedTrades(imported, 'générique');
+      } catch(err) {
+        console.error(err);
+        showAlert("Impossible de lire ce relevé automatiquement (format non reconnu par le parseur). Vous pouvez ajouter les trades manuellement, ou me montrer un extrait du fichier pour que j'adapte l'import.");
+      }
+      e.target.value = '';
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function cleanupDuplicates() {
+    const seen = new Set();
+    let removed = 0;
+    const cleaned = [];
+    trades.forEach(t => {
+      const sig = tradeSignature(t);
+      if (seen.has(sig)) { removed++; return; }
+      seen.add(sig);
+      cleaned.push(t);
+    });
+    if (!removed) { showAlert('Aucun doublon détecté.'); return; }
+    showConfirm(removed + ' doublon(s) détecté(s) (même position / mêmes date, symbole, entrée, sortie, taille et résultat). Les supprimer et ne garder qu\'un exemplaire de chacun ?', () => {
+      trades = cleaned;
+      saveTrades();
+      render();
+      showAlert(removed + ' doublon(s) supprimé(s).');
+    });
+  }
+
+  // ============================================================================
+  // RENDU
+  // ============================================================================
+  function render() {
+    const list = filteredTrades();
+    const s = stats(list);
+    const setups = uniqueSetups();
+    const symbols = Array.from(new Set(trades.map(t=>t.symbol))).sort();
+    const platforms = uniquePlatforms();
+    const acc = accountMetrics();
+    const disc = planDiscipline(trades);
+    const confUsage = confirmationUsageStats();
+    const compliance = computeCompliance(complianceView);
+
+    root.innerHTML = `
+      <div class="jt-container">
+      <div class="jt-header">
+        <div class="jt-title">JOURNAL DE <span>TRADING</span></div>
+      </div>
+
+      ${lastSaveError ? `
+        <div class="error-banner">
+          <span>⚠ La dernière sauvegarde (${escapeHtml(lastSaveError.what)}) a échoué (erreur serveur de stockage). Vos données restent en mémoire dans cette page — pensez à exporter en JSON en attendant.</span>
+          <button id="btn-retry-save">Réessayer</button>
+        </div>
+      ` : ''}
+
+      <div class="jt-panel" style="border-color:#2a3450;">
+        <h3>⚙ Réglages & Connexion</h3>
+        <p class="jt-note">
+          Une connexion en direct à MT4/MT5 n'est pas possible depuis un outil web (pas d'API publique, et je ne fais saisir aucun identifiant de trading ici par sécurité).
+          À la place : importez le relevé d'historique exporté depuis votre terminal (HTML, Excel .xls/.xlsx, CSV, texte — le parseur détecte automatiquement le format). Les positions déjà présentes ne sont jamais réimportées en double.
+        </p>
+        <div class="jt-actions" style="flex-wrap:wrap;">
+          <button class="jt-btn primary" id="btn-mt-import-trigger">📥 Importer un relevé MT4/MT5</button>
+          <input type="file" id="btn-mt-import" class="import-input" accept="*/*">
+          <button class="jt-btn" id="btn-account">💼 Solde, dépôts & retraits</button>
+          <button class="jt-btn" id="btn-export">⬇ Sauvegarder (JSON)</button>
+          <button class="jt-btn" id="btn-import-trigger">⬆ Restaurer une sauvegarde</button>
+          <input type="file" id="btn-import" class="import-input" accept="application/json">
+        </div>
+      </div>
+
+      <div class="jt-toolbar">
+        <select class="jt-select" id="f-symbol"><option value="">Tous les symboles</option>${symbols.map(sym=>`<option ${filters.symbol===sym?'selected':''}>${escapeHtml(sym)}</option>`).join('')}</select>
+        <select class="jt-select" id="f-setup"><option value="">Tous les setups</option>${setups.map(sp=>`<option ${filters.setup===sp?'selected':''}>${escapeHtml(sp)}</option>`).join('')}</select>
+        <select class="jt-select" id="f-side"><option value="">Long / Short</option><option ${filters.side==='Long'?'selected':''}>Long</option><option ${filters.side==='Short'?'selected':''}>Short</option></select>
+        <select class="jt-select" id="f-status"><option value="">Win / Loss</option><option ${filters.status==='Win'?'selected':''}>Win</option><option ${filters.status==='Loss'?'selected':''}>Loss</option></select>
+        <select class="jt-select" id="f-platform">
+          <option value="">Tous les logiciels (rapport combiné)</option>
+          ${platforms.map(p=>`<option ${filters.platform===p?'selected':''}>${escapeHtml(p)}</option>`).join('')}
+        </select>
+        <button class="jt-btn" id="btn-clear">Effacer les filtres</button>
+      </div>
+
+      <div class="jt-panel-head" style="margin-top:6px;">
+        <h3 style="text-transform:none;font-size:18px;letter-spacing:.3px;color:#e6e9f0;">📋 Plan de trading</h3>
+        <button class="jt-btn" id="btn-plan">✎ Définir / modifier mon plan</button>
+      </div>
+      <div class="jt-panel">
+        ${!plan.confirmations.length && !plan.assets.length ? `
+          <div class="empty-state" style="padding:20px;">Aucun plan défini pour l'instant. Cliquez sur "Définir / modifier mon plan" pour le créer.</div>
+        ` : `
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;font-size:13px;">
+            <div><div style="color:#7c8bb5;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Type / Actifs</div>${plan.traderType||'—'} · ${plan.assets.join(', ')||'—'}</div>
+            <div><div style="color:#7c8bb5;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Sessions</div>${plan.sessions.join(', ')||'—'} (${plan.sessionStart||'—'}–${plan.sessionEnd||'—'})</div>
+            <div><div style="color:#7c8bb5;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Confirmations (informatif)</div>${plan.confirmations.join(', ')||'—'}</div>
+            <div><div style="color:#7c8bb5;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Risque / RR</div>${plan.riskPerTrade||'—'}% par trade · RR min ${plan.rrMin==='Autre'?(plan.rrCustom||'Autre'):(plan.rrMin||'—')}</div>
+            <div><div style="color:#7c8bb5;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Limites de perte</div>${plan.maxLossSession||'—'}%/jour · ${plan.maxLossWeek||'—'}%/semaine · stop après ${plan.stopAfterLosses||'—'} pertes</div>
+            <div><div style="color:#7c8bb5;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Checklist psychologie</div>${plan.psychChecklist.join(', ')||'—'}</div>
+          </div>
+        `}
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid #1f2740;display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
+          <div><div class="label" style="font-size:11px;color:#7c8bb5;text-transform:uppercase;">Discipline (marquage manuel)</div>
+            <div style="font-size:22px;font-weight:800;" class="${disc.rate===null?'':(disc.rate>=70?'pos':'neg')}">${disc.rate===null?'—':disc.rate.toFixed(0)+'%'}</div>
+            <div style="font-size:11px;color:#7c8bb5;">${disc.marked} trade(s) évalué(s) manuellement</div>
+          </div>
+          ${disc.winWhenRespected!==null ? `<div><div class="label" style="font-size:11px;color:#7c8bb5;text-transform:uppercase;">Réussite si respecté</div><div style="font-size:22px;font-weight:800;" class="pos">${disc.winWhenRespected.toFixed(0)}%</div></div>` : ''}
+          ${disc.winWhenNot!==null ? `<div><div class="label" style="font-size:11px;color:#7c8bb5;text-transform:uppercase;">Réussite si non respecté</div><div style="font-size:22px;font-weight:800;" class="neg">${disc.winWhenNot.toFixed(0)}%</div></div>` : ''}
+        </div>
+        ${confUsage.length ? `
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid #1f2740;">
+          <div class="label" style="font-size:11px;color:#7c8bb5;text-transform:uppercase;margin-bottom:8px;">Confirmations les plus utilisées</div>
+          <div>${confUsage.map(c=>`<span class="tag">${escapeHtml(c.name)} — ${c.pct}%</span>`).join('')}</div>
+        </div>` : ''}
+      </div>
+
+      <div class="jt-panel-head" style="margin-top:6px;">
+        <h3 style="text-transform:none;font-size:18px;letter-spacing:.3px;color:#e6e9f0;">🧭 Respect automatique du plan</h3>
+        <select class="jt-select jt-btn-sm" id="f-compliance">
+          <option value="day" ${complianceView==='day'?'selected':''}>Par jour</option>
+          <option value="week" ${complianceView==='week'?'selected':''}>Par semaine</option>
+          <option value="month" ${complianceView==='month'?'selected':''}>Par mois</option>
+          <option value="year" ${complianceView==='year'?'selected':''}>Par année</option>
+        </select>
+      </div>
+      <div class="jt-panel">
+        <p class="jt-note" style="margin-top:-4px;">
+          Approximatif : calculé à partir des règles chiffrées de votre plan comparées à vos trades. "Non évalué" = aucune règle chiffrée définie pour cette période.
+        </p>
+        ${!compliance.length ? '<div class="empty-state" style="padding:20px;">Aucun trade à évaluer pour le moment.</div>' : `
+        <div class="scroll-box" style="max-height:340px;">
+        <table>
+          <thead><tr><th>Période</th><th>Trades</th><th>PnL</th><th>PnL %</th><th>Verdict</th><th>Détail</th></tr></thead>
+          <tbody>
+            ${compliance.map(c => `
+              <tr>
+                <td>${c.key}</td>
+                <td>${c.count}</td>
+                <td class="${c.pnl>=0?'ret-pos':'ret-neg'}">${fmt$(c.pnl)}</td>
+                <td class="${c.pnlPct>=0?'ret-pos':'ret-neg'}">${c.pnlPct.toFixed(2)}%</td>
+                <td><span class="badge ${c.verdict==='Respecté'?'win':c.verdict==='Non respecté'?'loss':'neutral'}">${c.verdict}</span>${c.manualCount?` <span class="badge neutral">✎ ${c.manualCount}</span>`:''}</td>
+                <td style="font-size:11.5px;color:#9fb0d6;white-space:normal;">${c.reasons.join(' · ')||'—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        </div>`}
+      </div>
+
+      <div class="jt-panel-head" style="margin-top:6px;">
+        <h3 style="text-transform:none;font-size:18px;letter-spacing:.3px;color:#e6e9f0;">📈 Compte</h3>
+        <button class="jt-btn" id="btn-account2">⚙ Paramètres du compte</button>
+      </div>
+      <div class="jt-stats">
+        <div class="jt-card"><div class="label">Gain (profit / total déposé)</div><div class="value ${acc.gain>=0?'pos':'neg'}">${acc.gain>=0?'+':''}${acc.gain.toFixed(2)}%</div></div>
+        <div class="jt-card"><div class="label">Drawdown max</div><div class="value neg">${acc.drawdown.toFixed(2)}%</div></div>
+        <div class="jt-card"><div class="label">Solde</div><div class="value">${fmt$(acc.balance)}</div></div>
+        <div class="jt-card"><div class="label">BALANCE</div><div class="value">${fmt$(acc.equity)}</div></div>
+        <div class="jt-card"><div class="label">Plus haut (${acc.highestDate||'—'})</div><div class="value">${fmt$(acc.highest)}</div></div>
+        <div class="jt-card"><div class="label">Profit (trading)</div><div class="value ${acc.profit>=0?'pos':'neg'}">${fmt$(acc.profit)}</div></div>
+        <div class="jt-card"><div class="label">Total déposé / retiré</div><div class="value" style="font-size:15px;">${fmt$(account.deposits.reduce((s,d)=>s+d.amount,0))} / ${fmt$(account.withdrawals.reduce((s,w)=>s+w.amount,0))}</div></div>
+      </div>
+      <div class="jt-panel">
+        <h3>Évolution du solde (dépôts, retraits, trading)</h3>
+        <canvas id="chart-balance"></canvas>
+      </div>
+
+      <div class="jt-stats">
+        <div class="jt-card"><div class="label">Rendement cumulé (vue filtrée)</div><div class="value ${s.cumul>=0?'pos':'neg'}">${fmt$(s.cumul)}</div></div>
+        <div class="jt-card"><div class="label">Taux de réussite</div><div class="value">${s.winRatio.toFixed(2)}%</div></div>
+        <div class="jt-card"><div class="label">Rendement moyen / trade</div><div class="value ${s.avg>=0?'pos':'neg'}">${fmt$(s.avg)}</div></div>
+        <div class="jt-card"><div class="label">Nombre de trades</div><div class="value">${s.total}</div></div>
+      </div>
+
+      <div class="jt-layout">
+        <div class="jt-panel">
+          <div class="jt-panel-head">
+            <h3 style="margin:0;">Historique des trades ${filters.platform ? '— ' + escapeHtml(filters.platform) : '— tous logiciels combinés'}</h3>
+            <div class="jt-actions">
+              <button class="jt-btn primary jt-btn-sm" id="btn-add">+ Ajouter un trade</button>
+              <button class="jt-btn jt-btn-sm" id="btn-trade-settings">⚙ Paramètres initiaux</button>
+            </div>
+          </div>
+          ${list.length === 0 ? `<div class="empty-state"><b>Aucun trade ne correspond à ces filtres.</b><br>Ajoutez un trade ou modifiez les filtres ci-dessus.</div>` : `
+          <div class="scroll-box">
+          <table>
+            <thead><tr>
+              ${selectionMode ? `<th class="sel-col"><input type="checkbox" id="select-all-trades" ${list.length && list.every(t=>selectedIds.has(t.id)) ? 'checked' : ''}></th>` : ''}
+              <th>Statut</th><th>Date</th><th>Symbole</th><th>Entrée</th><th>Sortie</th><th>Taille</th><th>Sens</th><th>Return $</th><th>Plateforme</th><th>Confirmations</th><th>Plan</th><th></th>
+            </tr></thead>
+            <tbody>
+              ${list.map(t => `
+                <tr>
+                  ${selectionMode ? `<td class="sel-col"><input type="checkbox" class="row-select" data-id="${t.id}" ${selectedIds.has(t.id)?'checked':''}></td>` : ''}
+                  <td><span class="badge ${t.returnDollar>=0?'win':'loss'}">${t.returnDollar>=0?'WIN':'LOSS'}</span></td>
+                  <td>${t.date}</td>
+                  <td>${escapeHtml(t.symbol)}</td>
+                  <td>$${t.entry}</td>
+                  <td>$${t.exit}</td>
+                  <td>${t.size.toLocaleString('en-US')}</td>
+                  <td><span class="badge side-${t.side.toLowerCase()}">${t.side}</span></td>
+                  <td class="${t.returnDollar>=0?'ret-pos':'ret-neg'}">${fmt$(t.returnDollar)}</td>
+                  <td style="font-size:11.5px;color:#9fb0d6;">${escapeHtml(t.platform||'Manuel')}</td>
+                  <td>${(t.confirmations||[]).map(sp=>`<span class="tag">${escapeHtml(sp)}</span>`).join('')||'<span style="color:#4a5578;">—</span>'}</td>
+                  <td>${t.planRespected==='Oui' ? '<span class="badge win">✓ Oui</span>' : t.planRespected==='Non' ? '<span class="badge loss">✗ Non</span>' : '<span style="color:#4a5578;">—</span>'}</td>
+                  <td class="row-actions">
+                    <button data-edit="${t.id}" title="Modifier">✎</button>
+                    <button data-del="${t.id}" title="Supprimer">🗑</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot><tr><td colspan="${selectionMode?8:7}" style="color:#7c8bb5;">TOTAL — ${s.total} trades</td><td colspan="5" style="color:#7c8bb5;">${fmt$(s.cumul)}</td></tr></tfoot>
+          </table>
+          </div>`}
+        </div>
+
+        <div>
+          <div class="jt-panel">
+            <h3>Performance cumulée (vue filtrée)</h3>
+            <canvas id="chart-equity"></canvas>
+          </div>
+          <div class="jt-panel">
+            <h3>Taux de réussite par setup</h3>
+            <canvas id="chart-setups"></canvas>
+          </div>
+        </div>
+      </div>
+      </div>
+    `;
+
+    if (lastSaveError) document.getElementById('btn-retry-save').onclick = lastSaveError.retry;
+    document.getElementById('btn-plan').onclick = openPlanModal;
+    document.getElementById('btn-account').onclick = openAccountModal;
+    document.getElementById('btn-account2').onclick = openAccountModal;
+    document.getElementById('btn-add').onclick = () => openModal(null);
+    document.getElementById('btn-trade-settings').onclick = openTradeSettingsModal;
+
+    if (selectionMode) {
+      const selectAllBox = document.getElementById('select-all-trades');
+      if (selectAllBox) selectAllBox.onchange = (e) => {
+        if (e.target.checked) list.forEach(t => selectedIds.add(t.id));
+        else list.forEach(t => selectedIds.delete(t.id));
+        render();
+      };
+      root.querySelectorAll('.row-select').forEach(cb => cb.onchange = (e) => {
+        const id = parseInt(e.target.dataset.id);
+        if (e.target.checked) selectedIds.add(id); else selectedIds.delete(id);
+        render();
+      });
+    }
+
+    document.getElementById('btn-mt-import-trigger').onclick = () => document.getElementById('btn-mt-import').click();
+    document.getElementById('btn-mt-import').onchange = importMTReport;
+    document.getElementById('btn-clear').onclick = () => { filters = { symbol:"", setup:"", side:"", status:"", platform:"" }; render(); };
+    document.getElementById('f-symbol').onchange = e => { filters.symbol = e.target.value; render(); };
+    document.getElementById('f-setup').onchange = e => { filters.setup = e.target.value; render(); };
+    document.getElementById('f-side').onchange = e => { filters.side = e.target.value; render(); };
+    document.getElementById('f-status').onchange = e => { filters.status = e.target.value; render(); };
+    document.getElementById('f-platform').onchange = e => { filters.platform = e.target.value; render(); };
+    document.getElementById('f-compliance').onchange = e => { complianceView = e.target.value; render(); };
+    document.getElementById('btn-export').onclick = exportJSON;
+    document.getElementById('btn-import-trigger').onclick = () => document.getElementById('btn-import').click();
+    document.getElementById('btn-import').onchange = importJSON;
+
+    root.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openModal(parseInt(b.dataset.edit)));
+    root.querySelectorAll('[data-del]').forEach(b => b.onclick = () => deleteTrade(parseInt(b.dataset.del)));
+
+    drawCharts(list, acc);
+  }
+
+  function drawCharts(list, acc) {
+    const sorted = list.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+    let cum = 0;
+    const equityData = sorted.map(t => { cum += t.returnDollar; return cum; });
+    const labels = sorted.map(t => t.date);
+
+    const ctx1 = document.getElementById('chart-equity');
+    if (ctx1) {
+      new Chart(ctx1, {
+        type: 'line',
+        data: { labels, datasets: [{ data: equityData, borderColor:'#22d3ac', backgroundColor:'rgba(34,211,172,.08)', fill:true, tension:.3, pointRadius:0, borderWidth:2 }] },
+        options: { plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#7c8bb5', maxTicksLimit:5}, grid:{color:'#1a2035'}}, y:{ticks:{color:'#7c8bb5'}, grid:{color:'#1a2035'}} } }
+      });
+    }
+
+    const setupMap = {};
+    list.forEach(t => (t.setups||[]).forEach(sp => {
+      if (!setupMap[sp]) setupMap[sp] = { win:0, total:0 };
+      setupMap[sp].total++;
+      if (t.returnDollar >= 0) setupMap[sp].win++;
+    }));
+    const setupNames = Object.keys(setupMap);
+    const setupRatios = setupNames.map(n => Math.round(setupMap[n].win/setupMap[n].total*100));
+
+    const ctx2 = document.getElementById('chart-setups');
+    if (ctx2 && setupNames.length) {
+      new Chart(ctx2, {
+        type: 'bar',
+        data: { labels: setupNames, datasets: [{ data: setupRatios, backgroundColor:'#8b5cf6', borderRadius:5 }] },
+        options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#7c8bb5'}, grid:{color:'#1a2035'}, max:100}, y:{ticks:{color:'#cbd3e6'}, grid:{display:false}} } }
+      });
+    }
+
+    const ctx3 = document.getElementById('chart-balance');
+    if (ctx3 && acc && acc.curve.length) {
+      const curveLabels = acc.curve.map(p => p.date);
+      const balanceLine = acc.curve.map(p => p.value);
+      const depositPoints = acc.curve.map(p => p.kind === 'deposit' ? p.value : null);
+      const withdrawalPoints = acc.curve.map(p => p.kind === 'withdrawal' ? p.value : null);
+      new Chart(ctx3, {
+        type: 'line',
+        data: {
+          labels: curveLabels,
+          datasets: [
+            { label:'Solde', data: balanceLine, borderColor:'#f59e0b', backgroundColor:'transparent', tension:.25, pointRadius:0, borderWidth:2 },
+            { label:'Dépôt', data: depositPoints, showLine:false, pointBackgroundColor:'#22d3ac', pointBorderColor:'#22d3ac', pointRadius:6, type:'scatter' },
+            { label:'Retrait', data: withdrawalPoints, showLine:false, pointBackgroundColor:'#f87171', pointBorderColor:'#f87171', pointRadius:6, type:'scatter' }
+          ]
+        },
+        options: { plugins:{legend:{labels:{color:'#9fb0d6'}}}, scales:{ x:{ticks:{color:'#7c8bb5', maxTicksLimit:6}, grid:{color:'#1a2035'}}, y:{ticks:{color:'#7c8bb5'}, grid:{color:'#1a2035'}} } }
+      });
+    }
+  }
+
+  function deleteTrade(id, afterDelete) {
+    showConfirm('Supprimer ce trade ? Cette action est irréversible.', () => {
+      trades = trades.filter(t => t.id !== id);
+      saveTrades();
+      render();
+      if (afterDelete) afterDelete();
+    }, { danger: true });
+  }
+
+  // ============================================================================
+  // MODALE — Paramètres initiaux (sélection, suppression, réinitialisation, doublons)
+  // ============================================================================
+  function openTradeSettingsModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="width:480px;">
+        <h2>⚙ Paramètres initiaux</h2>
+        <p class="jt-note">Actions globales sur l'historique des trades. Chaque suppression demande une confirmation.</p>
+
+        <label class="chk-label" style="font-size:13.5px;margin-bottom:14px;">
+          <input type="checkbox" id="ts-selection" ${selectionMode?'checked':''}>
+          Activer le mode sélection (affiche les cases à cocher pour choisir des trades précis)
+        </label>
+
+        <div class="jt-actions" style="flex-direction:column;align-items:stretch;gap:10px;">
+          <button class="jt-btn danger" id="ts-del-selected" ${selectionMode && selectedIds.size ? '' : 'disabled'}>🗑 Supprimer la sélection (${selectedIds.size})</button>
+          <button class="jt-btn danger" id="ts-del-all">🗑 Supprimer tous les trades</button>
+          <button class="jt-btn" id="ts-dedup">🧹 Nettoyer les doublons existants</button>
+          <button class="jt-btn danger" id="ts-reset-all">♻ Réinitialiser toutes les données (trades + compte + plan)</button>
+        </div>
+
+        <div class="modal-footer">
+          <button class="jt-btn" id="ts-close">Fermer</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#ts-close').onclick = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+    overlay.querySelector('#ts-selection').onchange = (e) => {
+      selectionMode = e.target.checked;
+      if (!selectionMode) selectedIds = new Set();
+      overlay.remove();
+      render();
+    };
+
+    overlay.querySelector('#ts-del-selected').onclick = () => {
+      if (!selectedIds.size) return;
+      overlay.remove();
+      showConfirm(`Supprimer les ${selectedIds.size} trade(s) sélectionné(s) ? Cette action est irréversible.`, () => {
+        trades = trades.filter(t => !selectedIds.has(t.id));
+        selectedIds = new Set();
+        saveTrades();
+        render();
+        showAlert('Trades sélectionnés supprimés avec succès.');
+      }, { danger: true });
+    };
+
+    overlay.querySelector('#ts-del-all').onclick = () => {
+      overlay.remove();
+      if (trades.length === 0) { showAlert('Il n\'y a déjà aucun trade.'); return; }
+      showConfirm(`Supprimer TOUS les trades (${trades.length}) ? Le compte et le plan ne sont pas touchés. Cette action est irréversible.`, () => {
+        trades = []; selectedIds = new Set();
+        saveTrades();
+        render();
+        showAlert('Tous les trades ont été supprimés avec succès.');
+      }, { danger: true });
+    };
+
+    overlay.querySelector('#ts-dedup').onclick = () => { overlay.remove(); cleanupDuplicates(); };
+
+    overlay.querySelector('#ts-reset-all').onclick = () => {
+      overlay.remove();
+      showConfirm('Réinitialiser TOUTES les données (trades, compte, plan de trading) ? Cette action est irréversible. Pensez à exporter une sauvegarde avant si besoin.', () => {
+        trades = [];
+        account = { deposits: [], withdrawals: [], equityOverride: null };
+        plan = { traderType:'', assets:[], sessions:[], sessionStart:'09:30', sessionEnd:'18:00', tradeAfterNews:'', confirmations:[], riskPerTrade:'', maxLossSession:'', maxLossWeek:'', maxGainSession:'', stopAfterLosses:'', rrMin:'', rrCustom:'', tradeManagement:[], psychChecklist:[], monthlyGoal:'', notes:'' };
+        selectedIds = new Set(); selectionMode = false; filters = { symbol:"", setup:"", side:"", status:"", platform:"" };
+        saveTrades(); saveAccount(); savePlan();
+        render();
+        showAlert('Toutes les données ont été réinitialisées avec succès.');
+      }, { danger: true });
+    };
+  }
+
+  // ============================================================================
+  // MODALE — Ajout / modification d'un trade
+  // ============================================================================
+  function openModal(id) {
+    const t = id ? trades.find(x => x.id === id) : {
+      date:new Date().toISOString().slice(0,10), symbol:'', entry:'', exit:'', size:'', side:'Long',
+      returnDollar:'', returnPercent:'', setups:[], confirmations:[], planRespected:'', platform:'Manuel'
+    };
+    const confirmationChoices = (plan.confirmations && plan.confirmations.length) ? plan.confirmations : CONFIRMATION_OPTIONS;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <h2>${id ? 'Modifier le trade' : 'Ajouter un trade'}</h2>
+        <div class="form-row">
+          <div><label>Date</label><input type="date" id="m-date" value="${t.date}"></div>
+          <div><label>Symbole</label><input type="text" id="m-symbol" value="${escapeHtml(t.symbol)}" placeholder="ex: BTCUSD"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Prix d'entrée</label><input type="number" step="any" id="m-entry" value="${t.entry}"></div>
+          <div><label>Prix de sortie</label><input type="number" step="any" id="m-exit" value="${t.exit}"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Taille</label><input type="number" step="any" id="m-size" value="${t.size}"></div>
+          <div><label>Sens</label><select id="m-side"><option ${t.side==='Long'?'selected':''}>Long</option><option ${t.side==='Short'?'selected':''}>Short</option></select></div>
+        </div>
+        <div class="form-row">
+          <div><label>Return $</label><input type="number" step="any" id="m-retd" value="${t.returnDollar}"></div>
+          <div><label>Plateforme / logiciel</label><input type="text" id="m-platform" value="${escapeHtml(t.platform||'Manuel')}" placeholder="ex: Manuel, MT5-XTB..."></div>
+        </div>
+
+        <label class="section-label">Confirmations utilisées (informatif, facultatif)</label>
+        <div class="setup-input-row">
+          <select id="m-conf-select"><option value="">— choisir dans le plan —</option>${confirmationChoices.map(o=>`<option>${escapeHtml(o)}</option>`).join('')}</select>
+          <button class="jt-btn" id="m-conf-pick" type="button">Ajouter</button>
+        </div>
+        <div class="setup-input-row">
+          <input type="text" id="m-conf-input" placeholder="ou saisir une confirmation personnalisée">
+          <button class="jt-btn" id="m-conf-add" type="button">Ajouter</button>
+        </div>
+        <div class="setup-tags" id="m-conf-tags"></div>
+
+        <div class="form-row" style="margin-top:12px;">
+          <div><label>Plan respecté ? (remplace l'évaluation automatique)</label>
+            <select id="m-planresp">
+              <option value="" ${!t.planRespected?'selected':''}>— Évaluation automatique —</option>
+              <option value="Oui" ${t.planRespected==='Oui'?'selected':''}>Oui</option>
+              <option value="Non" ${t.planRespected==='Non'?'selected':''}>Non</option>
+            </select>
+          </div>
+          <div></div>
+        </div>
+
+        <label class="section-label">Setups</label>
+        <div class="setup-input-row">
+          <input type="text" id="m-setup-input" placeholder="ex: Gap Up (Entrée pour ajouter)">
+          <button class="jt-btn" id="m-setup-add" type="button">Ajouter</button>
+        </div>
+        <div class="setup-tags" id="m-setup-tags"></div>
+
+        <div class="modal-footer spread">
+          ${id ? '<button class="jt-btn danger" id="m-delete">🗑 Supprimer ce trade</button>' : '<span></span>'}
+          <div class="jt-actions">
+            <button class="jt-btn" id="m-cancel">Annuler</button>
+            <button class="jt-btn primary" id="m-save">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    let currentSetups = (t.setups||[]).slice();
+    let currentConfs = (t.confirmations||[]).slice();
+
+    function renderSetupTags() {
+      document.getElementById('m-setup-tags').innerHTML = currentSetups.map((sp,i) => `<span class="tag">${escapeHtml(sp)} <button data-i="${i}">×</button></span>`).join('');
+      document.getElementById('m-setup-tags').querySelectorAll('button').forEach(b => b.onclick = () => { currentSetups.splice(parseInt(b.dataset.i),1); renderSetupTags(); });
+    }
+    function renderConfTags() {
+      document.getElementById('m-conf-tags').innerHTML = currentConfs.map((c,i) => `<span class="tag">${escapeHtml(c)} <button data-i="${i}">×</button></span>`).join('');
+      document.getElementById('m-conf-tags').querySelectorAll('button').forEach(b => b.onclick = () => { currentConfs.splice(parseInt(b.dataset.i),1); renderConfTags(); });
+    }
+    renderSetupTags();
+    renderConfTags();
+
+    document.getElementById('m-setup-add').onclick = () => {
+      const inp = document.getElementById('m-setup-input');
+      const val = inp.value.trim();
+      if (val) { currentSetups.push(val); inp.value = ''; renderSetupTags(); }
+    };
+    document.getElementById('m-setup-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('m-setup-add').click(); } });
+
+    document.getElementById('m-conf-pick').onclick = () => {
+      const sel = document.getElementById('m-conf-select');
+      if (sel.value && !currentConfs.includes(sel.value)) { currentConfs.push(sel.value); renderConfTags(); }
+      sel.value = '';
+    };
+    document.getElementById('m-conf-add').onclick = () => {
+      const inp = document.getElementById('m-conf-input');
+      const val = inp.value.trim();
+      if (val && !currentConfs.includes(val)) { currentConfs.push(val); inp.value = ''; renderConfTags(); }
+    };
+    document.getElementById('m-conf-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('m-conf-add').click(); } });
+
+    overlay.querySelector('#m-cancel').onclick = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+    const delBtn = overlay.querySelector('#m-delete');
+    if (delBtn) delBtn.onclick = () => { deleteTrade(id, () => {}); overlay.remove(); };
+
+    overlay.querySelector('#m-save').onclick = () => {
+      const entryV = parseFloat(document.getElementById('m-entry').value) || 0;
+      const exitV = parseFloat(document.getElementById('m-exit').value) || 0;
+      const sideV = document.getElementById('m-side').value;
+      const retD = parseFloat(document.getElementById('m-retd').value) || 0;
+      const retP = entryV ? ((sideV==='Long' ? (exitV-entryV)/entryV : (entryV-exitV)/entryV) * 100) : 0;
+      const newTrade = {
+        id: id || Date.now(),
+        sourceId: t.sourceId || null,
+        date: document.getElementById('m-date').value,
+        symbol: document.getElementById('m-symbol').value.toUpperCase() || 'N/A',
+        entry: entryV, exit: exitV,
+        size: parseFloat(document.getElementById('m-size').value) || 0,
+        side: sideV,
+        returnDollar: retD,
+        returnPercent: Math.round(retP*10000)/10000,
+        platform: document.getElementById('m-platform').value.trim() || 'Manuel',
+        confirmations: currentConfs,
+        planRespected: document.getElementById('m-planresp').value,
+        setups: currentSetups.length ? currentSetups : ['Non classé']
+      };
+      if (id) { trades = trades.map(x => x.id === id ? newTrade : x); }
+      else { trades.push(newTrade); }
+      saveTrades();
+      overlay.remove();
+      render();
+    };
+  }
+
+  // ============================================================================
+  // MODALE — Plan de trading
+  // ============================================================================
+  function openPlanModal() {
+    let customAssets = plan.assets.filter(a => !ASSET_OPTIONS.includes(a));
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    const chk = (list, options, idPrefix) => options.map((o,i) => `
+      <label class="chk-label"><input type="checkbox" id="${idPrefix}-${i}" ${list.includes(o)?'checked':''}> ${escapeHtml(o)}</label>`).join('');
+    overlay.innerHTML = `
+      <div class="modal" style="width:600px;">
+        <h2>Mon plan de trading</h2>
+        <div class="form-row">
+          <div><label>Type de trader</label>
+            <select id="p-type"><option value="">—</option>${['Scalping','Intraday','Swing','Position'].map(o=>`<option ${plan.traderType===o?'selected':''}>${o}</option>`).join('')}</select>
+          </div>
+          <div><label>Objectif mensuel (%)</label><input type="number" step="any" id="p-goal" value="${plan.monthlyGoal}"></div>
+        </div>
+
+        <label class="section-label">Actifs tradés</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;">${chk(plan.assets, ASSET_OPTIONS, 'p-asset')}</div>
+        <div class="setup-tags" id="p-asset-custom-tags"></div>
+        <div class="setup-input-row">
+          <input type="text" id="p-asset-input" placeholder="Ajouter un actif personnalisé (ex: SP500)">
+          <button class="jt-btn" id="p-asset-add" type="button">Ajouter</button>
+        </div>
+
+        <label class="section-label">Sessions tradées</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;">${chk(plan.sessions, SESSION_OPTIONS, 'p-session')}</div>
+
+        <div class="form-row" style="margin-top:10px;">
+          <div><label>Début session</label><input type="time" id="p-start" value="${plan.sessionStart}"></div>
+          <div><label>Fin session</label><input type="time" id="p-end" value="${plan.sessionEnd}"></div>
+        </div>
+
+        <div class="form-row">
+          <div><label>Trader après une news ?</label>
+            <select id="p-news"><option value="">—</option>${['Oui','Non','Parfois'].map(o=>`<option ${plan.tradeAfterNews===o?'selected':''}>${o}</option>`).join('')}</select>
+          </div>
+          <div><label>RR minimum</label>
+            <select id="p-rr">
+              <option value="">—</option>
+              ${RR_OPTIONS.map(o=>`<option ${plan.rrMin===o?'selected':''}>${o}</option>`).join('')}
+            </select>
+            <input type="text" id="p-rr-custom" placeholder="Précisez (ex: 1:2.5)" value="${escapeHtml(plan.rrCustom||'')}" style="margin-top:6px;display:${plan.rrMin==='Autre'?'block':'none'};">
+          </div>
+        </div>
+
+        <label class="section-label">Confirmations utilisées habituellement (informatif, non obligatoire)</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;">${chk(plan.confirmations, CONFIRMATION_OPTIONS, 'p-conf')}</div>
+
+        <div class="form-row" style="margin-top:10px;">
+          <div><label>Risque max par trade (%)</label><input type="number" step="any" id="p-risk" value="${plan.riskPerTrade}"></div>
+          <div><label>Arrêt après N pertes consécutives</label><input type="number" step="1" id="p-stopn" value="${plan.stopAfterLosses}"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Perte max / jour (%)</label><input type="number" step="any" id="p-lsess" value="${plan.maxLossSession}"></div>
+          <div><label>Perte max / semaine (%)</label><input type="number" step="any" id="p-lweek" value="${plan.maxLossWeek}"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Gain max / jour (%)</label><input type="number" step="any" id="p-gsess" value="${plan.maxGainSession}"></div>
+          <div></div>
+        </div>
+
+        <label class="section-label">Gestion du trade une fois ouvert</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;">${chk(plan.tradeManagement, MANAGEMENT_OPTIONS, 'p-mgmt')}</div>
+
+        <label class="section-label">Checklist psychologique avant de trader</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;">${chk(plan.psychChecklist, PSYCH_OPTIONS, 'p-psych')}</div>
+
+        <div class="form-row full" style="margin-top:10px;">
+          <label>Notes libres</label>
+          <textarea id="p-notes" rows="3" style="width:100%;background:#0d1220;border:1px solid #262f47;color:#e6e9f0;padding:9px 10px;border-radius:7px;font-size:13px;font-family:inherit;">${escapeHtml(plan.notes||'')}</textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button class="jt-btn" id="p-cancel">Annuler</button>
+          <button class="jt-btn primary" id="p-save">Enregistrer</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const collect = (options, idPrefix) => options.filter((o,i) => overlay.querySelector(`#${idPrefix}-${i}`).checked);
+
+    function renderAssetTags() {
+      overlay.querySelector('#p-asset-custom-tags').innerHTML = customAssets.map((a,i)=>`<span class="tag">${escapeHtml(a)} <button data-i="${i}" class="p-asset-del">×</button></span>`).join('');
+      overlay.querySelectorAll('.p-asset-del').forEach(b => b.onclick = () => { customAssets.splice(parseInt(b.dataset.i),1); renderAssetTags(); });
+    }
+    renderAssetTags();
+    overlay.querySelector('#p-asset-add').onclick = () => {
+      const inp = overlay.querySelector('#p-asset-input');
+      const val = inp.value.trim();
+      if (val) { customAssets.push(val); inp.value=''; renderAssetTags(); }
+    };
+
+    overlay.querySelector('#p-rr').onchange = e => {
+      overlay.querySelector('#p-rr-custom').style.display = e.target.value === 'Autre' ? 'block' : 'none';
+    };
+
+    overlay.querySelector('#p-cancel').onclick = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+    overlay.querySelector('#p-save').onclick = () => {
+      plan = {
+        traderType: document.getElementById('p-type').value,
+        monthlyGoal: document.getElementById('p-goal').value,
+        assets: collect(ASSET_OPTIONS, 'p-asset').concat(customAssets),
+        sessions: collect(SESSION_OPTIONS, 'p-session'),
+        sessionStart: document.getElementById('p-start').value,
+        sessionEnd: document.getElementById('p-end').value,
+        tradeAfterNews: document.getElementById('p-news').value,
+        rrMin: document.getElementById('p-rr').value,
+        rrCustom: document.getElementById('p-rr-custom').value,
+        confirmations: collect(CONFIRMATION_OPTIONS, 'p-conf'),
+        riskPerTrade: document.getElementById('p-risk').value,
+        stopAfterLosses: document.getElementById('p-stopn').value,
+        maxLossSession: document.getElementById('p-lsess').value,
+        maxLossWeek: document.getElementById('p-lweek').value,
+        maxGainSession: document.getElementById('p-gsess').value,
+        tradeManagement: collect(MANAGEMENT_OPTIONS, 'p-mgmt'),
+        psychChecklist: collect(PSYCH_OPTIONS, 'p-psych'),
+        notes: document.getElementById('p-notes').value
+      };
+      savePlan();
+      overlay.remove();
+      render();
+      showAlert('Plan de trading enregistré avec succès.');
+    };
+  }
+
+  // ============================================================================
+  // MODALE — Paramètres du compte
+  // ============================================================================
+  function openAccountModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <h2>Paramètres du compte</h2>
+        <p class="jt-note" style="margin-top:-10px;">
+          Aucune connexion automatique à un broker n'est possible depuis cet outil local. Votre solde = tous vos dépôts moins vos retraits, plus le profit de vos trades.
+          <b>Votre tout premier dépôt correspond à votre capital de départ</b> — inutile de le compter deux fois.
+        </p>
+        <div class="form-row">
+          <div><label>BALANCE (optionnel — sinon = solde calculé)</label><input type="number" step="any" id="a-equity" value="${account.equityOverride ?? ''}"></div>
+          <div></div>
+        </div>
+
+        <label class="section-label">Dépôts</label>
+        <div id="a-deposits-list" style="margin:8px 0;"></div>
+        <div class="setup-input-row">
+          <input type="date" id="a-dep-date" style="max-width:150px;">
+          <input type="number" step="any" id="a-dep-amount" placeholder="Montant">
+          <button class="jt-btn" id="a-dep-add" type="button">Ajouter</button>
+        </div>
+
+        <label class="section-label" style="margin-top:14px;">Retraits</label>
+        <div id="a-withdrawals-list" style="margin:8px 0;"></div>
+        <div class="setup-input-row">
+          <input type="date" id="a-wd-date" style="max-width:150px;">
+          <input type="number" step="any" id="a-wd-amount" placeholder="Montant">
+          <button class="jt-btn" id="a-wd-add" type="button">Ajouter</button>
+        </div>
+
+        <div class="modal-footer">
+          <button class="jt-btn" id="a-cancel">Annuler</button>
+          <button class="jt-btn primary" id="a-save">Enregistrer</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    let deposits = account.deposits.slice();
+    let withdrawals = account.withdrawals.slice();
+
+    function renderLists() {
+      document.getElementById('a-deposits-list').innerHTML = deposits.map((d,i) =>
+        `<div class="jt-chip" style="margin:4px 4px 0 0;">${d.date} — ${fmt$(d.amount)} <button data-i="${i}" class="a-dep-del">×</button></div>`
+      ).join('') || '<span style="color:#4a5578;font-size:12px;">Aucun dépôt enregistré</span>';
+      document.getElementById('a-withdrawals-list').innerHTML = withdrawals.map((w,i) =>
+        `<div class="jt-chip" style="margin:4px 4px 0 0;">${w.date} — ${fmt$(w.amount)} <button data-i="${i}" class="a-wd-del">×</button></div>`
+      ).join('') || '<span style="color:#4a5578;font-size:12px;">Aucun retrait enregistré</span>';
+
+      overlay.querySelectorAll('.a-dep-del').forEach(b => b.onclick = () => {
+        showConfirm('Supprimer ce dépôt ?', () => { deposits.splice(parseInt(b.dataset.i),1); renderLists(); }, { danger: true });
+      });
+      overlay.querySelectorAll('.a-wd-del').forEach(b => b.onclick = () => {
+        showConfirm('Supprimer ce retrait ?', () => { withdrawals.splice(parseInt(b.dataset.i),1); renderLists(); }, { danger: true });
+      });
+    }
+    renderLists();
+
+    document.getElementById('a-dep-add').onclick = () => {
+      const date = document.getElementById('a-dep-date').value;
+      const amount = parseFloat(document.getElementById('a-dep-amount').value);
+      if (date && amount) { deposits.push({date, amount}); document.getElementById('a-dep-amount').value=''; renderLists(); }
+    };
+    document.getElementById('a-wd-add').onclick = () => {
+      const date = document.getElementById('a-wd-date').value;
+      const amount = parseFloat(document.getElementById('a-wd-amount').value);
+      if (date && amount) { withdrawals.push({date, amount}); document.getElementById('a-wd-amount').value=''; renderLists(); }
+    };
+
+    overlay.querySelector('#a-cancel').onclick = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+    overlay.querySelector('#a-save').onclick = () => {
+      const eqVal = document.getElementById('a-equity').value;
+      account = { deposits, withdrawals, equityOverride: eqVal === '' ? null : parseFloat(eqVal) };
+      saveAccount();
+      overlay.remove();
+      render();
+      showAlert('Paramètres du compte enregistrés avec succès.');
+    };
+  }
+
+  // ============================================================================
+  // EXPORT / IMPORT JSON
+  // ============================================================================
+  function exportJSON() {
+    const payload = { trades, account, plan };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'journal-trading-' + new Date().toISOString().slice(0,10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showAlert('Sauvegarde exportée avec succès : ' + trades.length + ' trade(s), compte et plan inclus.');
+  }
+
+  function importJSON(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const imported = JSON.parse(evt.target.result);
+        if (Array.isArray(imported)) { trades = imported; }
+        else if (imported && Array.isArray(imported.trades)) {
+          trades = imported.trades;
+          if (imported.account) account = imported.account;
+          if (imported.plan) plan = imported.plan;
+        } else { throw new Error('format invalide'); }
+        saveTrades(); saveAccount(); savePlan();
+        render();
+        showAlert('Restauration réussie : ' + trades.length + ' trade(s) chargé(s).');
+      } catch(err) {
+        showAlert("Fichier invalide. Assurez-vous d'importer un export JSON généré par ce journal.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  loadTrades();
+})();
+</script>
+
+</body>
+</html>
